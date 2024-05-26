@@ -15,3 +15,7 @@ A - X
 Load New Rom - I   
 Pause Emulator - O   
 Step Into Next Cycle - P   
+
+## Supported Mappers
+- NROM
+- UNROM
