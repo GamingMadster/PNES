@@ -545,9 +545,9 @@ void draw() {
   image(ppu.display, 0, 0, 512, 484);
   
   fill(255);
-  if(!cpu.running)text("PAUSED",220,220);
-  
-  noStroke();
+  textSize(32);
+  if(!cpu.running)text("PAUSED",4,26);
+  textSize(16);
 
   // debug
   fill(color(50, 0, 100));
@@ -597,6 +597,9 @@ void draw() {
   text("SLY - "+ppu.slY, 640, 36);
 
   text("PPU ADDR - $"+hex(ppu.addr, 4), 768, 24);
+  
+  text("I - Load New Rom    O - Pause/Unpause Emulator",520,448);
+  text("P - Step Into Next Cycle",520,464);
 
   for (int i = cpu.pc; i<cpu.pc+26; i++) {
     Object[][] row = ops[cpu.bus[i&0xFFFF]>>4];
