@@ -6,6 +6,8 @@ NES6502 cpu;
 NESPPU ppu;
 NESAPU apu;
 
+boolean debug = false;
+
 // for debugging
 Object[][][] ops = {
   {{"BRK", "IMPL", }, {"ORA", "INDX", }, {"JAM", "IMPL", }, {"SLO", "INDX", }, {"NOP", "ZPG", }, {"ORA", "ZPG", }, {"ASL", "ZPG", }, {"SLO", "ZPG", }, {"PHP", "IMPL", }, {"ORA", "IMM", }, {"ASL", "A", }, {"SLO", "ZPG", }, {"NOP", "ABS"}, {"ORA", "ABS", }, {"ASL", "ABS", }, {"SLO", "ABS", }, },
@@ -191,6 +193,16 @@ void keyPressed() {
     cpu.running = false;
     selectInput("Select a .NES file to load.", "loadROM");
   }
+  
+  if (key=='u') {
+    debug = !debug;
+    
+    if(debug){
+      surface.setSize(1130, 480);
+    }else{
+      surface.setSize(1024, 1032);
+    }
+  }
 
   for (int i = 0; i<8; i++) {
     Object[] ctrlbutton = nesctrl[i];
@@ -213,10 +225,10 @@ void keyReleased() {
 
 void setup() {
   // create the canvas
-  size(1130, 480);
+  size(1024, 1032, P2D);
 
   noStroke();
-  noSmooth();
+  ((PGraphicsOpenGL)g).textureSampling(3);
 
   // fonts
   font = createFont("MinecraftBold-nMK1.otf", 64, true);
@@ -261,9 +273,12 @@ void setup() {
   ppu.nt3.beginDraw();
   ppu.nt4.beginDraw();
   ppu.display.beginDraw();
+  
+  
 }
 
 void draw() {
+  background(0);
   
   ppu.display.loadPixels();
   
@@ -276,6 +291,8 @@ void draw() {
 
   //ppu cycle rate - 89343
   //cpu cycle rate - 29781
+  
+  IntList sprrender = new IntList();
 
   if (cpu.running) {
     for (int i = 0; i<89489; i++) {
@@ -292,6 +309,7 @@ void draw() {
           ppu.slX = -1;
         }
         ppu.slY ++;
+        sprrender = new IntList();
         if (ppu.slY==240) {
           cpu.bus[0x2002] |= 0b10000000;
         }
@@ -301,7 +319,7 @@ void draw() {
       }
       
       if(ppu.slY==-1&&ppu.slX==0){
-        cpu.bus[0x2002] &= 0b00111111;
+        cpu.bus[0x2002] &= 0b00011111;
         ppu.nmi = false;
       }
       
@@ -320,23 +338,19 @@ void draw() {
 
       if (ppu.slY>-1&&ppu.slY<239) {
         if (ppu.slX>-1&&ppu.slX<256) {
-          int basent = 0x2000+0x400*(cpu.bus[0x2000]&0b11);
-
+          int basent = 0x2000 + 0x400*(cpu.bus[0x2000]&0b11);
+          int baseatt = 0x23c0 + 0x400*(cpu.bus[0x2000]&0b11);
 
           int ppux = floor(((ppu.slX + ppu.scX) % 256) / 8) + floor((ppu.scX + (ppu.slX) % 256) / 256) * 0x400;
-          
-          
-          int ppuy = (floor(((ppu.slY+ppu.scY)%240)/8)*32)+floor((ppu.scY+(ppu.slY%240))/240)*0x800;
-          int attx = floor(((ppu.slX+ppu.scX)%256)/32)+floor((ppu.scX+(ppu.slX%256))/256)*0x400;
-          int atty = (floor(((ppu.slY+ppu.scY)%240)/32)*8)+floor((ppu.scY+(ppu.slY%240))/240)*0x800;
+          int ppuy = (floor(((ppu.slY + ppu.scY) % 240) / 8) * 32) + floor((ppu.scY + (ppu.slY % 240)) / 240) * 0x800;
+          int attx = floor(((ppu.slX  +ppu.scX) % 256) / 32) + floor((ppu.scX + (ppu.slX % 256)) / 256) * 0x400;
+          int atty = (floor(((ppu.slY + ppu.scY) % 240) / 32) * 8) + floor((ppu.scY + (ppu.slY % 240)) / 256) * 0x800;
 
-
-          int ppuaddr = (((basent + ppux + ppuy) - 0x2000) % 0x1000) + 0x2000;
+          int ppuaddr = ((((basent + ppux + ppuy) - 0x2000) % 0x1000) + 0x2000);
           
-          
-          int attribute = (ppu.bus[(0x23c0 + 0x400*(cpu.bus[0x2000]&0b11)) + attx + atty] >> ((floor((ppu.slX+ppu.scX)/16)%2)*2)+(floor((ppu.slY+ppu.scY)/16)%2)*4) & 0b11;
+          int attribute = (ppu.bus[(((baseatt + attx + atty) - 0x23c0) % 0x1000) + 0x23c0] >> ((floor((ppu.slX+ppu.scX)/16)%2)*2)+(floor((ppu.slY+ppu.scY+16*floor((ppu.scY+(ppu.slY%240))/256))/16)%2)*4) & 0b11;
 
-          //if(ppu.slX%8==0)ppu.nt1 = ppu.bus[ppuaddr];
+          //if(ppu.slX%8==0)ppu.NT = ppu.bus[ppuaddr];
           //if(ppu.slX%16==0)ppu.AT = attribute;
           int addr = ppu.bus[ppuaddr];
           int tile;
@@ -366,7 +380,14 @@ void draw() {
           for (int o = 0; o<256; o+=4) {
             if (ppu.slY>=(ppu.oam[o]+1)&&ppu.slY<(ppu.oam[o]+9+8*(((cpu.bus[0x2000]>>5)&0x1)))) {
               if (ppu.slX>=ppu.oam[o+3]&&ppu.slX<(ppu.oam[o+3]+8)) {
-                drawSprites(o, ((ppu.oam[o+2]>>5)&0x1));
+                if(sprrender.size()<=8){
+                  if(!sprrender.hasValue(o)){
+                    sprrender.append(o);
+                  }
+                  drawSprites(o, ((ppu.oam[o+2]>>5)&0x1));
+                }else{
+                  cpu.bus[0x2002] |= 0b100000;
+                }
               }
             }
           }
@@ -393,30 +414,34 @@ void draw() {
   apu.pulse1.width(dutytable[cpu.bus[0x4000]>>6]);
   apu.pulse2.width(dutytable[cpu.bus[0x4004]>>6]);
 
-  float pulse1freq = 1789773/(16*apu.timer1+1);
-  float pulse2freq = 1789773/(16*apu.timer2+1);
-  float trianglefreq = 1789773/(16*apu.timer3+1);
+  float pulse1freq = 1789772.66667/(16*apu.timer1+1);
+  float pulse2freq = 1789772.66667/(16*apu.timer2+1);
+  float trianglefreq = 1789772.66667/(16*apu.timer3+1);
 
   apu.pulse1.freq(pulse1freq);
   apu.pulse2.freq(pulse2freq);
   apu.triangle.freq(trianglefreq);
 
-  if((cpu.bus[0x4000]&0xF)>0){
+  if((cpu.bus[0x4000]&0xF)>0&&cpu.running){
     apu.pulse1.amp(((float)(cpu.bus[0x4000]&0xF))/32+0.2);
   }else{
     apu.pulse1.amp(0);
   }
-  if((cpu.bus[0x4004]&0xF)>0){
+  if((cpu.bus[0x4004]&0xF)>0&&cpu.running){
     apu.pulse2.amp(((float)(cpu.bus[0x4004]&0xF))/32+0.15);
   }else{
     apu.pulse2.amp(0);
   }
-  if((cpu.bus[0x400C]&0xF)>0){
+  if((cpu.bus[0x400C]&0xF)>0&&cpu.running){
     apu.noise.amp(((float)(cpu.bus[0x400C]&0xF))/16+1.2);
   }else{
     apu.noise.amp(0);
   }
-  apu.triangle.amp(0.8);
+  if(cpu.running){
+    apu.triangle.amp(0.8);
+  }else{
+    apu.triangle.amp(0);
+  }
 
   if ((cpu.bus[0x4015]&0x1)==0) {
     apu.pulse1.amp(0);
@@ -542,122 +567,134 @@ void draw() {
   ppu.nt3.updatePixels();
   ppu.nt4.updatePixels();
 
-  image(ppu.display, 0, 0, 512, 484);
+  if(debug){
+    image(ppu.display, 0, 0, 512, 480);
   
-  fill(255);
-  textSize(32);
-  if(!cpu.running)text("PAUSED",4,26);
-  textSize(16);
-
-  // debug
-  fill(color(50, 0, 100));
-  rect(512, 0, 618, 480);
-
-  //858,0,256,240
-  image(ppu.nt1, 858, 64, 128, 120);
-  image(ppu.nt2, 986, 64, 128, 120);
-  image(ppu.nt3, 858, 184, 128, 120);
-  image(ppu.nt4, 986, 184, 128, 120);
-
-  fill(color(25, 0, 50));
-  rect(524, 71, 318, 362);
-
-  fill(color(100, 100, 0));
-  rect(524, 71, 318, 12);
-
-  fill(255);
-
-  text("STATUS - ", 512, 12);
-
-  fill(cpu.status&0b10000000);
-  text("N", 600, 12);
-  fill((cpu.status&0b1000000)<<1);
-  text("V", 614, 12);
-  fill((cpu.status&0b100000)<<2);
-  text("U", 628, 12);
-  fill((cpu.status&0b10000)<<3);
-  text("B", 642, 12);
-  fill((cpu.status&0b1000)<<4);
-  text("D", 656, 12);
-  fill((cpu.status&0b100)<<5);
-  text("I", 670, 12);
-  fill((cpu.status&0b10)<<6);
-  text("Z", 681, 12);
-  fill((cpu.status&0b1)<<7);
-  text("C", 695, 12);
-
-  fill(255);
-
-  text("PC - $"+hex(cpu.pc, 4), 512, 24);
-  text("A - $"+hex(cpu.a, 2), 512, 36);
-  text("X - $"+hex(cpu.x, 2), 512, 48);
-  text("Y - $"+hex(cpu.y, 2), 512, 60);
-
-  text("SLX - "+ppu.slX, 640, 24);
-  text("SLY - "+ppu.slY, 640, 36);
-
-  text("PPU ADDR - $"+hex(ppu.addr, 4), 768, 24);
+    fill(255);
+    textSize(32);
+    if(!cpu.running)text("PAUSED",4,26);
+    textSize(16);
   
-  text("I - Load New Rom    O - Pause/Unpause Emulator",520,448);
-  text("P - Step Into Next Cycle",520,464);
-
-  for (int i = cpu.pc; i<cpu.pc+26; i++) {
-    Object[][] row = ops[cpu.bus[i&0xFFFF]>>4];
-
-    Object[] op = row[cpu.bus[i&0xFFFF]&0xF];
-
-    String inst;
-    String addrM;
-
-    String value = "";
-
-    if (op.length>0) {
-      inst = (String)op[0];
-      addrM = (String)op[1];
-
-      switch(addrM) {
-      case "IMM":
-        value = hex(cpu.bus[(i+1)&0xFFFF], 2);
-        break;
-
-      case "ZPG":
-        value = hex(cpu.bus[(i+1)&0xFFFF], 2);
-        break;
-
-      case "ZPGX":
-        value = hex(cpu.bus[(i+1+cpu.x)&0xFFFF], 2);
-        break;
-
-      case "ZPGY":
-        value = hex(cpu.bus[(i+1+cpu.y)&0xFFFF], 2);
-        break;
-
-      case "ABS":
-        value = hex((cpu.bus[(i+2)&0xFFFF]<<8)+cpu.bus[(i+1)&0xFFFF], 4);
-        break;
-
-      case "ABSX":
-        value = hex((cpu.bus[(i+2+cpu.x)&0xFFFF]<<8)+cpu.bus[(i+1+cpu.x)&0xFFFF], 4);
-        break;
-
-      case "ABSY":
-        value = hex((cpu.bus[(i+2+cpu.y)&0xFFFF]<<8)+cpu.bus[(i+1+cpu.y)&0xFFFF], 4);
-        break;
-
-      case "REL":
-        value = hex(i+2 + (cpu.bus[i+1]<<24>>24), 4);
-        break;
+    // debug
+    fill(color(50, 0, 100));
+    rect(512, 0, 618, 480);
+  
+    //858,0,256,240
+    image(ppu.nt1, 858, 64, 128, 120);
+    image(ppu.nt2, 986, 64, 128, 120);
+    image(ppu.nt3, 858, 184, 128, 120);
+    image(ppu.nt4, 986, 184, 128, 120);
+  
+    fill(color(25, 0, 50));
+    rect(524, 71, 318, 362);
+  
+    fill(color(100, 100, 0));
+    rect(524, 71, 318, 12);
+  
+    fill(255);
+  
+    text("STATUS - ", 512, 12);
+  
+    fill(cpu.status&0b10000000);
+    text("N", 600, 12);
+    fill((cpu.status&0b1000000)<<1);
+    text("V", 614, 12);
+    fill((cpu.status&0b100000)<<2);
+    text("U", 628, 12);
+    fill((cpu.status&0b10000)<<3);
+    text("B", 642, 12);
+    fill((cpu.status&0b1000)<<4);
+    text("D", 656, 12);
+    fill((cpu.status&0b100)<<5);
+    text("I", 670, 12);
+    fill((cpu.status&0b10)<<6);
+    text("Z", 681, 12);
+    fill((cpu.status&0b1)<<7);
+    text("C", 695, 12);
+  
+    fill(255);
+  
+    text("PC - $"+hex(cpu.pc, 4), 512, 24);
+    text("A - $"+hex(cpu.a, 2), 512, 36);
+    text("X - $"+hex(cpu.x, 2), 512, 48);
+    text("Y - $"+hex(cpu.y, 2), 512, 60);
+  
+    text("SLX - "+ppu.slX, 640, 24);
+    text("SLY - "+ppu.slY, 640, 36);
+  
+    text("PPU ADDR - $"+hex(ppu.addr, 4), 768, 24);
+    
+    text("I - Load New Rom    O - Pause/Unpause Emulator",520,448);
+    text("P - Step Into Next Cycle    U - Debug Toggle",520,464);
+    
+    for (int i = cpu.pc; i<cpu.pc+26; i++) {
+      Object[][] row = ops[cpu.bus[i&0xFFFF]>>4];
+  
+      Object[] op = row[cpu.bus[i&0xFFFF]&0xF];
+  
+      String inst;
+      String addrM;
+  
+      String value = "";
+  
+      if (op.length>0) {
+        inst = (String)op[0];
+        addrM = (String)op[1];
+  
+        switch(addrM) {
+        case "IMM":
+          value = hex(cpu.bus[(i+1)&0xFFFF], 2);
+          break;
+  
+        case "ZPG":
+          value = hex(cpu.bus[(i+1)&0xFFFF], 2);
+          break;
+  
+        case "ZPGX":
+          value = hex(cpu.bus[(i+1+cpu.x)&0xFFFF], 2);
+          break;
+  
+        case "ZPGY":
+          value = hex(cpu.bus[(i+1+cpu.y)&0xFFFF], 2);
+          break;
+  
+        case "ABS":
+          value = hex((cpu.bus[(i+2)&0xFFFF]<<8)+cpu.bus[(i+1)&0xFFFF], 4);
+          break;
+  
+        case "ABSX":
+          value = hex((cpu.bus[(i+2+cpu.x)&0xFFFF]<<8)+cpu.bus[(i+1+cpu.x)&0xFFFF], 4);
+          break;
+  
+        case "ABSY":
+          value = hex((cpu.bus[(i+2+cpu.y)&0xFFFF]<<8)+cpu.bus[(i+1+cpu.y)&0xFFFF], 4);
+          break;
+  
+        case "REL":
+          value = hex(i+2 + (cpu.bus[i+1]<<24>>24), 4);
+          break;
+        }
+      } else {
+        inst = "???";
+        addrM = "???";
       }
-    } else {
-      inst = "???";
-      addrM = "???";
+  
+      if (value!="") {
+        value = ", ($"+value+")";
+      }
+  
+      text("$"+hex(i&0xFFFF, 4)+" - $"+hex(cpu.bus[i&0xFFFF], 2)+" - "+inst+", "+addrM+value, 536, 264+(i-cpu.pc-13)*14);
     }
-
-    if (value!="") {
-      value = ", ($"+value+")";
-    }
-
-    text("$"+hex(i&0xFFFF, 4)+" - $"+hex(cpu.bus[i&0xFFFF], 2)+" - "+inst+", "+addrM+value, 536, 264+(i-cpu.pc-13)*14);
+  }else{
+    image(ppu.display, 0, 0, 1024, 960);
+    
+    fill(255);
+    textSize(64);
+    if(!cpu.running)text("PAUSED",4,46);
+    textSize(32);
+    
+    text("I - Load New Rom    O - Pause/Unpause Emulator",0,984);
+    text("P - Step Into Next Cycle    U - Debug Toggle",0,1016);
   }
 
   windowTitle("PNES - FPS: "+frameRate);
@@ -3852,6 +3889,8 @@ int cpuread(int addr) {
     value = ppu.datab;
   
     ppu.datab = ppu.bus[ppu.addr%ppu.bus.length];
+    
+    if (ppu.addr>=0x3f00)value = ppu.datab;
 
     if ((cpu.bus[0x2000]&0x4)==4) {
       ppu.addr=(ppu.addr+32)&0x3fff;
@@ -3917,19 +3956,17 @@ void drawSprites(int o, int fg) {
   int ppos = (ppu.slX+ppu.slY*256)%ppu.display.pixels.length;
 
   if (ppu.sprcount<=8) {
-    if (pixel!=ppu.bus[0x3f00]) {
-      if ((cpu.bus[0x2001]&0b10000)>0) {
-        if (tile>0) {
-          if (fg==0) {
-            ppu.display.pixels[ppos] = ppu.palette[pixel];
-          } else {
-            if (ppu.display.pixels[ppos]==ppu.palette[ppu.bus[0x3f00]])ppu.display.pixels[(ppu.slX+ppu.slY*256)%ppu.display.pixels.length] = ppu.palette[pixel];
-          }
-          if (o==0&&ppu.display.pixels[ppos]!=ppu.palette[ppu.bus[0x3f00]]) {
-            if (((cpu.bus[0x2002]>>6)&0x1)==0) {
-              //println("SPRITE 0 HIT AT: ("+ppu.slX+", "+ppu.slY+")");
-              cpu.bus[0x2002] |= 0b01000000;
-            }
+    if ((cpu.bus[0x2001]&0b10000)>0) {
+      if (tile>0) {
+        if (fg==0) {
+          ppu.display.pixels[ppos] = ppu.palette[pixel];
+        } else {
+          if (ppu.display.pixels[ppos]==ppu.palette[ppu.bus[0x3f00]])ppu.display.pixels[(ppu.slX+ppu.slY*256)%ppu.display.pixels.length] = ppu.palette[pixel];
+        }
+        if (o==0&&ppu.display.pixels[ppos]!=ppu.palette[ppu.bus[0x3f00]]) {
+          if (((cpu.bus[0x2002]>>6)&0x1)==0) {
+            //println("SPRITE 0 HIT AT: ("+ppu.slX+", "+ppu.slY+")");
+            cpu.bus[0x2002] |= 0b01000000;
           }
         }
       }
