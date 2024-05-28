@@ -15,6 +15,7 @@ A - X
 Load New Rom - I   
 Pause Emulator - O   
 Step Into Next Cycle - P   
+Toggle Debug Mode - U
 
 ## Supported Mappers
 - NROM
