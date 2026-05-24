@@ -1,22 +1,30 @@
-# ProcessingNES
-A not-too-accurate NES emulator written in Processing Java, Version 4.
+# ProcessingNES (PNES)
+A Nintendo Entertainment System emulator written in Java using the Processing IDE.
+
+The emulator currently passes `89 / 139` tests on the [AccuracyCoin](https://github.com/100thCoin/AccuracyCoin) test rom.
 
 ## Controls
 
-Left - Left Arrow   
-Right - Right Arrow   
-Down - Down Arrow   
-Up - Up Arrow   
-Start - Enter   
-Select - Space   
-B - Z   
-A - X   
+| Action | Key |
+| ------ | --- |
+| D-Pad Left | `Left Arrow` |
+| D-Pad Right | `Right Arrow` | 
+| D-Pad Down | `Down Arrow` |
+| D-Pad Up | `Up Arrow` |
+| Start | `Enter` |
+| Select | `Space` |
+| B Button | `Z` |
+| A Button | `X` |
 
-Load New Rom - I   
-Pause Emulator - O   
-Step Into Next Cycle - P   
-Toggle Debug Mode - U
+## Mapper Support 
+| Mapper|Support Status |
+| ----- | ------------- |
+| AxROM | Supported ✅ |
+| CNROM | Supported ✅ |
+| MMC1  | Supported ✅ |
+| MMC2  |Unsupported ❌ (Planned)|
+| MMC3  |Unsupported ❌ (Planned)|
+| NROM  | Supported ✅ |
+| UNROM | Supported ✅ |
 
-## Supported Mappers
-- NROM
-- UNROM
+Other mappers may partially function due to how .nes files are loaded in this emulator.
