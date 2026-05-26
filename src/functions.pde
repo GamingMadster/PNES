@@ -8,14 +8,17 @@ void initClasses() {
   
   gui = new LazyGui(this);
   
-  guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64)); // cpu register display
-  guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64)); // ppu register display
+  guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64));  // cpu register display
+  guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64));  // ppu register display
+  //guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(384, 128)); // cpu log
   
   for (PGraphics buffer : guiBuffers) {
     buffer.beginDraw();
     buffer.background(0);
     buffer.textSize(16);
     buffer.textAlign(LEFT, TOP);
+    buffer.textFont(mono);
+    buffer.fill(215);
   }
 
   // load the palette into the ppu
@@ -37,6 +40,8 @@ void initClasses() {
 
 // gui
 void setupGui() {
+  gui.colorPicker("options/themes/sketch background");
+  
   gui.pushFolder("emulator");
   
   gui.pushFolder("file"); // file folder
@@ -52,6 +57,7 @@ void setupGui() {
   gui.pushFolder("debug"); // debug folder
   gui.image("cpu registers", guiBuffers[0]);
   gui.image("ppu registers", guiBuffers[1]);
+  //gui.image("cpu log", guiBuffers[2]);
   
   gui.toggle("view blanking area");
   gui.toggle("show blanking area garbage");
@@ -77,10 +83,16 @@ void updateGui() {
   if (gui.button("pause \\/ resume")) {
     machineRunning = !machineRunning;
   }
-  if (gui.button("soft reset")) {
-    cpu.reset();
+  
+  if (cpuBus.romBanks != null) {
+    if (gui.button("soft reset")) {
+      cpu.reset();
+    }
+    if (gui.button("hard reset")) {
+      File file = null;
+      loadROM(file);
+    }
   }
-  gui.button("hard reset");
   gui.popFolder();
   
   // debug
@@ -99,12 +111,25 @@ void updateGui() {
   guiBuffers[0].text("PC: $" + hex(cpu.pc, 4), 128, 34);
   guiBuffers[0].text("OP: $" + hex(cpu.opCode, 2), 128, 50);
   
+  // ppu registers
+  guiBuffers[1].text("v: $" + hex(ppu.v, 4), 4, 2);
+  guiBuffers[1].text("t: $" + hex(ppu.t, 4), 4, 18);
+  guiBuffers[1].text("w: " + ppu.w, 4, 34);
+  guiBuffers[1].text("x: " + ppu.dot, 4, 50);
+  guiBuffers[1].text("y: " + ppu.scanline, 56, 50);
+  
+  //for (int logIndex = 0; logIndex < logTable.length; logIndex += 1) {
+  //  String log = logTable[logIndex];
+    
+  //  guiBuffers[2].text(log, 4, 2 + logIndex * 16);
+  //}
+  
   for (PGraphics buffer : guiBuffers) {
     buffer.endDraw();
   }
   
   gui.pushFolder("debug"); // debug folder
-  gui.image("cpu registers", guiBuffers[0]);
+  //gui.image("cpu registers", guiBuffers[0]);
   //gui.image("ppu registers", guiBuffers[1]);
   
   debugBooleans[0] = gui.toggle("view blanking area");
@@ -149,10 +174,14 @@ void runFrame() {
 
 // rom loading handler
 void loadROM(File rom) {
+  byte[] bytes = new byte[0];
   if (rom != null) {
-    // File byte array
-    byte[] bytes = loadBytes(rom);
-
+    bytes = loadBytes(rom);
+    cpuBus.rom = bytes;
+  }
+  if (cpuBus.rom.length != 0) bytes = cpuBus.rom;
+  
+  if (rom != null || cpuBus.rom.length != 0) {
     // Constants
     int PRG_ROM_SIZE = 16384;
     int CHR_ROM_SIZE = 0x1000;

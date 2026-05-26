@@ -24,7 +24,6 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
   // internal registers
   int v = 0;
   int t = 0;
-  int x = 0;
   boolean w = false;
 
   // exposed registers to the cpu bus
@@ -107,7 +106,7 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
         screen.updatePixels();
         
         if (gui.toggle("emulator/debug/view blanking area")) {
-          mainDisplay = screen;
+          mainDisplay = screen.get();
         } else {
           mainDisplay = screen.get(1, 0, 256, 240);
         }
@@ -325,51 +324,51 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
                   }
                   
                   if (!evalFound) spriteCount = append(spriteCount, oamIndex);
-                  if (spriteCount.length >= 9) {
-                    ppuStatus |= 0b00100000;
+                  // x and y offsets for fetching tiles
+                  int tileRow = scanline - y;
+                  int tileDot = dot - x - 1;
+                  
+                  int nextTile = 0;
+                  
+                  // sprite flip
+                  int flipX = (attributes & 0b01000000) > 0 ? tileDot : 7 - tileDot;
+                  int flipY = (attributes & 0b10000000) > 0 ? 7 - (tileRow % 8) : (tileRow % 8);
+                  
+                  // tile logic...
+                  int tableAddress;
+                  
+                  if (spriteHeight == 8) {
+                    tableAddress = (ppuCtrl & 0b1000) > 0 ? 0x1000 : 0;
                   } else {
-                    // x and y offsets for fetching tiles
-                    int tileRow = scanline - y;
-                    int tileDot = dot - x - 1;
+                    tableAddress = (tile & 1) > 0 ? 0x1000 : 0;
+                    tile &= ~1;
+                    nextTile = (attributes & 0b10000000) > 0 ? 1 - (int)Math.floor(tileRow / 8) : (int)Math.floor(tileRow / 8);
+                  }
+                  
+                  // tile hi byte and lo byte
+                  int tileLo = ppuBus.read(tableAddress + (tile + nextTile) * 16 + flipY);
+                  int tileHi = ppuBus.read(tableAddress + (tile + nextTile) * 16 + 8 + flipY);
+                  
+                  // the real pixel
+                  int shiftedPixel = (((tileHi >> flipX) & 1) << 1) | ((tileLo >> flipX) & 1);
+                  
+                  int paletteIndex = ppuBus.read(0x3F00 + (attributes & 3) * 4 + shiftedPixel + 16);
+                  
+                  int emphasisBits = ppuMask >> 5 << 6;
+                  int pixelColor = PALETTE[paletteIndex + emphasisBits];
+                  
+                  if (shiftedPixel > 0) {
+                    if (
+                      oamIndex == 0
+                      && bgOpaque
+                      && x <= 254
+                      && dot >= bgMask + 1
+                      && dot < 256
+                    ) ppuStatus |= 0b01000000;
                     
-                    int nextTile = 0;
-                    
-                    // sprite flip
-                    int flipX = (attributes & 0b01000000) > 0 ? tileDot : 7 - tileDot;
-                    int flipY = (attributes & 0b10000000) > 0 ? 7 - (tileRow % 8) : (tileRow % 8);
-                    
-                    // tile logic...
-                    int tableAddress;
-                    
-                    if (spriteHeight == 8) {
-                      tableAddress = (ppuCtrl & 0b1000) > 0 ? 0x1000 : 0;
+                    if (spriteCount.length >= 9) {
+                      ppuStatus |= 0b00100000;
                     } else {
-                      tableAddress = (tile & 1) > 0 ? 0x1000 : 0;
-                      tile &= ~1;
-                      nextTile = (attributes & 0b10000000) > 0 ? 1 - (int)Math.floor(tileRow / 8) : (int)Math.floor(tileRow / 8);
-                    }
-                    
-                    // tile hi byte and lo byte
-                    int tileLo = ppuBus.read(tableAddress + (tile + nextTile) * 16 + flipY);
-                    int tileHi = ppuBus.read(tableAddress + (tile + nextTile) * 16 + 8 + flipY);
-                    
-                    // the real pixel
-                    int shiftedPixel = (((tileHi >> flipX) & 1) << 1) | ((tileLo >> flipX) & 1);
-                    
-                    int paletteIndex = ppuBus.read(0x3F00 + (attributes & 3) * 4 + shiftedPixel + 16);
-                    
-                    int emphasisBits = ppuMask >> 5 << 6;
-                    int pixelColor = PALETTE[paletteIndex + emphasisBits];
-                    
-                    if (shiftedPixel > 0) {
-                      if (
-                        oamIndex == 0
-                        && bgOpaque
-                        && x <= 254
-                        && dot >= bgMask + 1
-                        && dot < 256
-                      ) ppuStatus |= 0b01000000;
-                      
                       if ((attributes & 0b100000) > 0) {
                         if (!bgOpaque) {
                           screen.pixels[dot + scanline * screen.width] = pixelColor;

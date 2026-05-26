@@ -1,6 +1,7 @@
 Ricoh2A03Bus cpuBus;
 
 class Ricoh2A03Bus { // the console's main bus (primarily used by the CPU)
+  byte[] rom = new byte[0];
   int[] ram = new int[0x800]; // ram (has a size of $0800, and is mirrored up to $1FFF)
   int[][] romBanks = null; // rom (has a variable size, in chunks of 16kb)
   int mapper = 0;
@@ -224,7 +225,7 @@ class Ricoh2A03Bus { // the console's main bus (primarily used by the CPU)
         }
         break;
       case 2: // UxROM
-        currentlySelectedBanks[0] = value;
+        currentlySelectedBanks[0] = value & 0xF;
         break;
       case 3: // CNROM
         ppuBus.currentlySelectedBanks[0] = (value & 3) << 1;

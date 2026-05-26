@@ -7,10 +7,14 @@ PGraphics[] guiBuffers = new PGraphics[0];
 
 PImage mainDisplay;
 
+PFont mono;
+
 void setup() {
   // setup the window
   size(1280, 720, P2D);
   surface.setResizable(true);
+  
+  mono = createFont("JetBrains.ttf", 14);
   
   ((PGraphicsOpenGL)g).textureSampling(3);
   imageMode(CENTER);
@@ -20,7 +24,7 @@ void setup() {
 }
 
 void draw() {
-  background(0);
+  background(gui.colorPicker("options/themes/sketch background").hex);
   
   windowTitle("PNES - FPS: " + (double)Math.round(frameRate * 100) / 100);
 
@@ -36,6 +40,8 @@ void draw() {
     float xRatio = (float)width / mainDisplay.width;
     float yRatio = (float)height / mainDisplay.height;
     float imgRatio = xRatio / yRatio;
+    
+    mainDisplay.filter(GRAY);
     
     if (imgRatio < 1) {
       image(mainDisplay, width / 2, height / 2, width, (float)height * imgRatio);
