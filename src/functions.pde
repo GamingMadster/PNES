@@ -3,11 +3,13 @@ void initClasses() {
   cpuBus = new Ricoh2A03Bus();
   ppuBus = new Ricoh2C02Bus();
 
-  cpu = new newRicoh2A03();
+  cpu = new Ricoh2A03();
   ppu = new Ricoh2C02();
+  apu = new RicohAPU();
   
   gui = new LazyGui(this);
   
+  // gui
   guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64));  // cpu register display
   guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(256, 64));  // ppu register display
   //guiBuffers = (PGraphics[])append(guiBuffers, createGraphics(384, 128)); // cpu log
@@ -21,6 +23,7 @@ void initClasses() {
     buffer.fill(215);
   }
 
+  // ppu
   // load the palette into the ppu
   byte[] loadedPalette = loadBytes("palettes/2C02G_wiki.pal");
 
@@ -36,6 +39,19 @@ void initClasses() {
   ppu.screen.loadPixels();
   
   setupGui();
+  
+  // apu
+  apu.pulse1 = new Pulse(this);
+  apu.pulse2 = new Pulse(this);
+  apu.triangle = new TriOsc(this);
+  
+  apu.pulse1.amp(0.05);
+  apu.pulse2.amp(0.05);
+  apu.triangle.amp(0.05);
+  
+  apu.pulse1.play();
+  apu.pulse2.play();
+  apu.triangle.play();
 }
 
 // gui
@@ -75,6 +91,9 @@ void updateGui() {
   
   gui.pushFolder("file"); // file folder
   if (gui.button("load ROM file (.nes)")) {
+    apu.pulse1.amp(0);
+    apu.pulse2.amp(0);
+    
     selectInput("Select a .NES file to load.", "loadROM");
   }
   gui.popFolder();
@@ -142,15 +161,25 @@ void updateGui() {
 
 // cycle hander
 void cycleMachine() {
-  float cycleRatio = ppu.SPEED / (cpu.SPEED * 2);
+  float cpuRatio = ppu.SPEED / (cpu.SPEED * 2);
+  
+  float apuRatio = cpu.SPEED / apu.SPEED;
 
   for (float ppuCycles = ppu.ppuOffset; ppuCycles <= ppu.SPEED; ppuCycles += 1) {
     ppu.clock();
     
-    if ((cpu.cpuCycles >= cycleRatio)) {
-      cpu.cpuCycles %= cycleRatio;
+    if ((cpu.cpuCycles >= cpuRatio)) {
+      cpu.cpuCycles %= cpuRatio;
 
       cpu.clock();
+      
+      if ((apu.apuCycles >= apuRatio)) {
+        apu.apuCycles %= apuRatio;
+        
+        apu.clock();
+      }
+      
+      apu.apuCycles += 1;
     }
 
     cpu.cpuCycles += 1;

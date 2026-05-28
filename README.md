@@ -4,7 +4,7 @@ A Nintendo Entertainment System emulator written in Java using the Processing ID
 > [!WARNING]
 > This emulator is heavily unoptimized in its current state. Most games will not run at a full 60 fps.
 
-PNES currently passes `89 / 139` tests on the [AccuracyCoin](https://github.com/100thCoin/AccuracyCoin) test rom.
+PNES currently passes `92 / 139` tests on the [AccuracyCoin](https://github.com/100thCoin/AccuracyCoin) test rom.
 <p align="center">
   <img src="images/test_results.png" width="512" height="480" alt="Test Results">
 </p>
