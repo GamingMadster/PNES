@@ -66,6 +66,8 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
   
   boolean bgEnabled = false;
   boolean spEnabled = false;
+  
+  int renderUpdateDelay = 0;
   boolean inRender = false;
   
   int bgMask = 0;
@@ -149,16 +151,21 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
     ntAddress = 0x2000 | (v & 0x0FFF);
     atAddress = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
     
-    bgEnabled = (ppuMask & 0b1000) > 0;
-    spEnabled = (ppuMask & 0b10000) > 0;
+    if (renderUpdateDelay > 0) {
+      renderUpdateDelay -= 1;
+      if (renderUpdateDelay == 0) {
+        bgEnabled = (ppuMask & 0b1000) > 0;
+        spEnabled = (ppuMask & 0b10000) > 0;
+      }
+    }
     
     bgMask = (ppuMask & 0b10) > 0 ? 0 : 8;
     spMask = (ppuMask & 0b100) > 0 ? 0 : 8;
     
     if (bgEnabled || spEnabled) { // is rendering enabled at all? clock shift registers if so
       if ((scanline >= 0 && scanline <= 239) || scanline == 261) {
+        inRender = true;
         if ((dot >= 1 && dot <= 256) || (dot >= 321 && dot <= 336)) {
-          inRender = true;
           if (dotMod == 0) {
             ntBuffer = append(ntBuffer, ppuBus.read(ntAddress)); // fetch tile and store to shift reg...
             ntBuffer = subset(ntBuffer, 1);
@@ -176,8 +183,6 @@ class Ricoh2C02 { // NES "Picture Processing Unit"
           if (dot == 256) {
             incrementY();
           }
-        } else {
-          inRender = false;
         }
         
         if (dot == 257) {

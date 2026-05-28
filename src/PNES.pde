@@ -1,3 +1,4 @@
+import processing.sound.*;
 import com.krab.lazy.*;
 
 boolean machineRunning = false;
@@ -32,6 +33,10 @@ void draw() {
   if (cpuBus.romBanks != null && machineRunning) {
     runFrame();
   } else {
+    apu.pulse1.amp(0);
+    apu.pulse2.amp(0);
+    apu.triangle.amp(0);
+    
     if (gui.toggle("emulator/debug/view blanking area")) {
       mainDisplay = ppu.screen.get();
     } else {
